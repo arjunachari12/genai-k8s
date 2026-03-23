@@ -2,6 +2,8 @@
 
 This repository contains the training project for Module 1: build and containerize a GenAI application, push the images to Docker Hub, and deploy the stack manually to a KIND cluster.
 
+It now also includes Module 5 assets for packaging the same application as a reusable Helm chart with environment-specific values.
+
 - A browser-based UI
 - A FastAPI backend
 - A local Ollama model runtime
@@ -13,6 +15,7 @@ The project stays intentionally focused on the core platform flow: containerizat
 ```text
 genai-platform/
 ├── api/
+├── helm/
 ├── k8s/
 ├── llm/
 ├── ui/
@@ -129,3 +132,81 @@ docker compose up --build
 ```
 
 Then open `http://localhost:8080`.
+
+## Module 5: Helm Chart Development
+
+The reusable Helm chart lives at `genai-platform/helm/genai-platform`.
+
+### Chart Structure
+
+```text
+genai-platform/helm/genai-platform/
+├── Chart.yaml
+├── values.yaml
+├── values-staging.yaml
+├── values-production.yaml
+└── templates/
+```
+
+### Validate the Chart
+
+```bash
+helm lint genai-platform/helm/genai-platform
+
+helm template genai genai-platform/helm/genai-platform \
+  --namespace genai-staging \
+  -f genai-platform/helm/genai-platform/values-staging.yaml
+```
+
+### Install for Staging
+
+```bash
+helm upgrade --install genai genai-platform/helm/genai-platform \
+  --namespace genai-staging \
+  --create-namespace \
+  -f genai-platform/helm/genai-platform/values-staging.yaml
+```
+
+Check the release:
+
+```bash
+helm status genai -n genai-staging
+kubectl get pods,svc -n genai-staging
+```
+
+### Upgrade the Release
+
+Example: change the API log level during the upgrade:
+
+```bash
+helm upgrade genai genai-platform/helm/genai-platform \
+  --namespace genai-staging \
+  -f genai-platform/helm/genai-platform/values-staging.yaml \
+  --set api.logLevel=WARNING
+```
+
+Review release history:
+
+```bash
+helm history genai -n genai-staging
+```
+
+### Roll Back
+
+```bash
+helm rollback genai 1 -n genai-staging
+helm history genai -n genai-staging
+```
+
+### Production Values
+
+The production override increases frontend and API replicas, uses a ClusterIP service for the UI, keeps ingress enabled, and raises resource requests for the Ollama runtime:
+
+```bash
+helm upgrade --install genai genai-platform/helm/genai-platform \
+  --namespace genai-prod \
+  --create-namespace \
+  -f genai-platform/helm/genai-platform/values-production.yaml
+```
+
+For the full student walkthrough that installs Prometheus, Grafana, Loki, Promtail, and the GenAI Helm chart together, use [MODULE5_HELM_OBSERVABILITY_APP.md](/home/arjun/genai-k8s/MODULE5_HELM_OBSERVABILITY_APP.md#L1).

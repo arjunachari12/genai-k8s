@@ -98,7 +98,7 @@ kubectl apply -f genai-platform/monitoring/grafana.yaml
 Check monitoring pods:
 
 ```bash
-kubectl get pods -n monitoring
+
 ```
 
 Check the application metrics endpoint from inside the cluster:
