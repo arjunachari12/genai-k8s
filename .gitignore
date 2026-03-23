@@ -1,5 +1,5 @@
 # Keep workshop instructions out of the student starter commit.
-/README.md
+
 
 # Students will create Kubernetes manifests as part of the exercise.
-/genai-platform/k8s/
+/genai-platform/monitoring/

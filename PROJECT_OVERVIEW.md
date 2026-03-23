@@ -68,6 +68,11 @@ genai-platform/
 │   │   └── main.py
 │   ├── Dockerfile
 │   └── requirements.txt
+├── monitoring/
+│   ├── grafana.yaml
+│   ├── loki.yaml
+│   ├── namespace.yaml
+│   └── prometheus.yaml
 ├── llm/
 │   ├── Dockerfile
 │   └── entrypoint.sh
@@ -103,6 +108,15 @@ This folder contains the local model runtime setup.
 - `entrypoint.sh`: starts Ollama and pulls the model
 - `Dockerfile`: builds the Ollama-based container image
 
+### `genai-platform/monitoring`
+
+This folder contains the observability module manifests.
+
+- `namespace.yaml`: creates the monitoring namespace
+- `prometheus.yaml`: deploys Prometheus and configures scraping for the FastAPI metrics endpoint
+- `grafana.yaml`: deploys Grafana with starter dashboards
+- `loki.yaml`: deploys Loki and Promtail for cluster log collection
+
 ### `genai-platform/docker-compose.yaml`
 
 This file is for local testing without Kubernetes.
@@ -122,6 +136,7 @@ This project is meant to teach students:
 3. How to containerize each service
 4. How to push images to Docker Hub
 5. How to deploy the system to Kubernetes
+6. How to observe the system with metrics and logs
 
 ## What Students Are Expected to Build
 
