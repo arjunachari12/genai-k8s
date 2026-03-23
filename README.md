@@ -2,7 +2,7 @@
 
 This repository contains the training project for Module 1: build and containerize a GenAI application, push the images to Docker Hub, and deploy the stack manually to a KIND cluster.
 
-It now also includes Module 5 assets for packaging the same application as a reusable Helm chart with environment-specific values.
+It now also includes Module 4 assets for autoscaling with KEDA and Prometheus metrics, plus Module 5 assets for packaging the same application as a reusable Helm chart with environment-specific values.
 
 - A browser-based UI
 - A FastAPI backend
@@ -132,6 +132,14 @@ docker compose up --build
 ```
 
 Then open `http://localhost:8080`.
+
+## Module 4: Autoscaling with KEDA and Prometheus
+
+The KEDA autoscaling workshop materials live in:
+
+[MODULE4_AUTOSCALING_KEDA.md](/home/arjun/genai-k8s/MODULE4_AUTOSCALING_KEDA.md)
+
+Students install Prometheus Adapter, create a latency recording rule, deploy KEDA, and scale the API from Prometheus-driven p95 latency.
 
 ## Module 5: Helm Chart Development
 

@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: genai-api
+  namespace: genai-staging
+  labels:
+    release: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: genai-platform
+      app.kubernetes.io/instance: genai
+      app.kubernetes.io/component: api
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

@@ -1,0 +1,79 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: genai-api
+  namespace: genai-platform
+  labels:
+    app: genai-platform
+    component: api
+spec:
+  replicas: 3
+  strategy:
+    canary:
+      steps:
+      - setWeight: 20
+      - pause: {duration: 30s}
+      - analysis:
+          templates:
+          - templateName: success-rate
+          args:
+          - name: service-name
+            value: genai-api-canary
+          - name: namespace
+            value: genai-platform
+      - setWeight: 50
+      - pause: {duration: 30s}
+      - analysis:
+          templates:
+          - templateName: success-rate
+          args:
+          - name: service-name
+            value: genai-api-canary
+          - name: namespace
+            value: genai-platform
+      - setWeight: 100
+      - pause: {duration: 30s}
+  selector:
+    matchLabels:
+      app: genai-platform
+      component: api
+  template:
+    metadata:
+      labels:
+        app: genai-platform
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: api
+        image: "genai-api:v1"  # Update this to match your image
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: APP_NAME
+          value: "genai-api"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: LLM_URL
+          value: "http://genai-llm:8001"
+        - name: MODEL_NAME
+          value: "llama2"
+        - name: OLLAMA_TIMEOUT_SECONDS
+          value: "30"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 30

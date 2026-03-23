@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: genai-platform
+spec:
+  metrics:
+  - name: success-rate
+    interval: 5s
+    successCondition: result[0] >= 0.95
+    provider:
+      prometheus:
+        address: http://prometheus.monitoring:9090
+        query: |
+          rate(http_requests_total{status!~"5.."}[5m]) / rate(http_requests_total[5m])
+  args:
+  - name: service-name
+  - name: namespace

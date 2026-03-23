@@ -1,0 +1,25 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: genai-api-latency
+  namespace: genai-staging
+spec:
+  scaleTargetRef:
+    name: genai-genai-platform-api
+  pollingInterval: 15
+  cooldownPeriod: 60
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 60
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://observability-kube-prometh-prometheus.monitoring.svc.cluster.local:9090
+        metricName: genai_api_latency_p95_seconds
+        query: avg(genai_api_latency_p95_seconds{namespace="genai-staging"})
+        threshold: "1.5"
+        activationThreshold: "0.8"

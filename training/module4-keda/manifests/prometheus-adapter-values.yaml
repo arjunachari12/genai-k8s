@@ -1,0 +1,19 @@
+prometheus:
+  url: http://observability-kube-prometh-prometheus.monitoring.svc
+  port: 9090
+  path: ""
+
+rules:
+  default: false
+  custom:
+    - seriesQuery: 'genai_api_latency_p95_seconds{namespace!="",pod!=""}'
+      resources:
+        overrides:
+          namespace:
+            resource: namespace
+          pod:
+            resource: pod
+      name:
+        matches: "genai_api_latency_p95_seconds"
+        as: "genai_api_latency_p95_seconds"
+      metricsQuery: 'max(<<.Series>>{<<.LabelMatchers>>}) by (namespace, pod)'

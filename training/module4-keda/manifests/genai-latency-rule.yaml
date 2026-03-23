@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: genai-api-latency
+  namespace: monitoring
+  labels:
+    release: observability
+spec:
+  groups:
+    - name: genai-api-latency
+      interval: 30s
+      rules:
+        - record: genai_api_latency_p95_seconds
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le, namespace, pod) (
+                rate(
+                  http_request_duration_seconds_bucket{
+                    namespace="genai-staging",
+                    pod=~"genai-genai-platform-api-.*",
+                    handler="/generate",
+                    method="POST"
+                  }[2m]
+                )
+              )
+            )
