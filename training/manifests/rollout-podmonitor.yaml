@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: genai-rollouts-api
+  namespace: genai-rollouts
+  labels:
+    release: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: genai-rollouts-api
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

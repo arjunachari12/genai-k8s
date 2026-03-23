@@ -12,16 +12,19 @@ Start here:
 
 ### Module 6: GitOps & Progressive Delivery with ArgoCD
 
-This hands-on training module builds upon your existing GenAI application deployed via Helm on a KIND Kubernetes cluster. You'll learn to implement GitOps practices using ArgoCD for continuous deployment and Argo Rollouts for progressive delivery strategies.
+This module builds on the Helm deployment from earlier labs and adds two platform workflows:
+
+- GitOps reconciliation with ArgoCD
+- Progressive delivery with Argo Rollouts and Prometheus analysis
 
 Module structure:
 
-1. **ArgoCD Installation** - Set up ArgoCD in your cluster
-2. **Creating ArgoCD Applications** - Deploy your Helm chart via ArgoCD
+1. **ArgoCD Installation** - Set up ArgoCD in the cluster
+2. **Creating ArgoCD Applications** - Deploy the Helm chart through ArgoCD
 3. **Auto-Sync & Self-Healing** - Enable automated reconciliation
 4. **Drift Detection** - Understand and observe drift
 5. **Argo Rollouts Installation** - Install the rollouts controller
-6. **Canary Deployment** - Implement progressive delivery
+6. **Canary Deployment** - Trigger a canary rollout in a dedicated demo namespace
 7. **Prometheus Analysis** - Add metrics-based rollout validation
 8. **Rollback Scenarios** - Handle deployment failures
 

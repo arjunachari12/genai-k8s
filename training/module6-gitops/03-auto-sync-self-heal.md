@@ -2,91 +2,69 @@
 
 ## Objective
 
-Enable ArgoCD's auto-sync features to automatically deploy changes and maintain cluster state, including self-healing and pruning of resources.
+Enable automated reconciliation so ArgoCD can correct drift without a manual sync command.
 
 ## Prerequisites
 
-- ArgoCD Application created and synced (from Lab 02)
-- Application currently in Manual sync mode
-- ArgoCD CLI installed and logged in
+- `genai-gitops` application created
+- ArgoCD CLI logged in
 
 ## Step-by-step Instructions
 
-### 1. Enable Auto-Sync via CLI
+### 1. Enable automated sync
 
 ```bash
-# Enable auto-sync, self-heal, and prune
-argocd app set genai-platform \
+argocd app set genai-gitops \
   --sync-policy automated \
   --self-heal \
-  --prune
+  --auto-prune \
+  --grpc-web
 ```
 
-### 2. Test Auto-Sync
+### 2. Confirm the setting
 
-Make a small change to trigger sync:
 ```bash
-# Edit values.yaml to change replica count
-sed -i 's/replicaCount: [0-9]/replicaCount: 2/' genai-platform/helm/genai-platform/values.yaml
-git add .
-git commit -m "Update replica count to 2"
-git push origin main
+argocd app get genai-gitops --grpc-web
 ```
 
-### 3. Observe Auto-Sync
+### 3. Test self-healing
 
-Watch ArgoCD automatically detect and sync the change:
+Create drift by scaling the API deployment away from Git:
+
 ```bash
-argocd app get genai-platform --watch
+kubectl scale deployment genai-genai-platform-api -n genai-gitops --replicas=2
+kubectl get deployment genai-genai-platform-api -n genai-gitops
 ```
 
-### 4. Test Self-Healing
+Wait for ArgoCD to reconcile:
 
-Manually delete a pod to trigger self-healing:
 ```bash
-kubectl delete pod -l app.kubernetes.io/name=genai-platform -n genai-platform --wait=false
+argocd app wait genai-gitops --sync --health --grpc-web --timeout 180
+kubectl get deployment genai-genai-platform-api -n genai-gitops
 ```
-
-Watch ArgoCD recreate the pod automatically.
-
-### 5. Test Pruning
-
-Add a resource to your Helm chart, deploy it, then remove it. ArgoCD should prune the deleted resource.
 
 ## Expected Output
 
-- Application syncs automatically when changes are detected
-- Deleted pods are automatically recreated
-- Removed resources are pruned from the cluster
+- Auto-sync enabled
+- Manual drift reverted by ArgoCD
+- Deployment returns to the Git-defined replica count
 
 ## Validation Steps
 
-1. Check application sync status:
+1. Check app config:
    ```bash
-   argocd app get genai-platform
+   argocd app get genai-gitops --grpc-web
    ```
-
-2. Verify self-healing:
+2. Check history:
    ```bash
-   kubectl get pods -n genai-platform -w
-   ```
-   Delete a pod and watch it restart.
-
-3. Check ArgoCD sync history:
-   ```bash
-   argocd app history genai-platform
+   argocd app history genai-gitops --grpc-web
    ```
 
 ## Troubleshooting
 
-- **Auto-sync not triggering**: Ensure your repository is properly configured and accessible
-- **Self-heal not working**: Check that the application has proper labels/selectors
-- **Pruning fails**: Verify resource ownership and finalizers
+- If drift is not corrected, confirm the application is in automated mode.
+- If the app stays out of sync, inspect the controller logs in `argocd`.
 
 ## What Just Happened?
 
-You enabled ArgoCD's GitOps automation features. Auto-sync keeps your cluster in sync with Git, self-healing maintains desired state, and pruning removes obsolete resources.
-
-## Challenge Exercise
-
-Create a ConfigMap in your Helm chart, deploy it, then remove it from the chart. Verify that ArgoCD prunes the ConfigMap automatically.
+You enabled the core GitOps loop. ArgoCD now watches for differences between Git and the cluster, then applies the Git-defined state automatically.

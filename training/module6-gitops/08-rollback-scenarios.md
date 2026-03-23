@@ -2,123 +2,53 @@
 
 ## Objective
 
-Learn how to handle deployment failures with automated and manual rollback mechanisms in Argo Rollouts.
+Trigger a failed canary revision and observe how Argo Rollouts protects the stable version.
 
 ## Prerequisites
 
-- Rollout with analysis configured (from Lab 07)
-- Application running stable version
-- ArgoCD CLI installed and logged in
+- Analysis template applied
+- Load generator running
 
 ## Step-by-step Instructions
 
-### 1. Simulate Failure Scenario
+### 1. Trigger a bad revision
 
-Deploy a "bad" version that will fail analysis:
-```yaml
-# In genai-platform/helm/genai-platform/values.yaml
-api:
-  image:
-    tag: "v2-bad"
-```
-
-Commit and push:
 ```bash
-git add .
-git commit -m "Deploy bad version v2-bad for rollback testing"
-git push origin main
+kubectl patch rollout genai-api -n genai-rollouts \
+  --type json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/env/2/value","value":"http://invalid-llm.genai-rollouts.svc.cluster.local:11434"}]'
 ```
 
-### 3. Observe Failure Detection
+This revision points the API at a non-existent LLM endpoint, so requests should fail during the canary stage.
 
-Watch the rollout status:
+### 2. Watch the rollout fail
+
 ```bash
-kubectl argo rollouts get rollout genai-api -n genai-platform -w
+kubectl argo rollouts get rollout genai-api -n genai-rollouts -w
+kubectl describe analysisrun -n genai-rollouts
 ```
 
-The rollout should show "Paused" or "Degraded" status.
+### 3. Abort and undo if needed
 
-### 4. Check Analysis Results
-
-Examine the failed analysis:
 ```bash
-kubectl describe analysisrun -n genai-platform
+kubectl argo rollouts abort genai-api -n genai-rollouts
+kubectl argo rollouts undo genai-api -n genai-rollouts
 ```
 
-### 5. Automatic Rollback
+Depending on timing, the rollout may already be aborted automatically by the failed analysis. In that case, `undo` is the main recovery action you need.
 
-If configured, the rollout should automatically rollback. Check:
+### 4. Restore the good configuration
+
 ```bash
-kubectl argo rollouts get rollout genai-api -n genai-platform
-```
-
-### 6. Manual Rollback (if needed)
-
-If auto-rollback didn't trigger:
-```bash
-kubectl argo rollouts abort genai-api -n genai-platform
-kubectl argo rollouts undo genai-api -n genai-platform
-```
-
-### 7. Verify Rollback
-
-Ensure traffic is back to stable version:
-```bash
-kubectl get pods -n genai-platform
-```
-
-All pods should be running the stable version.
-
-### 8. Fix and Redeploy
-
-Update to a good version:
-```yaml
-# In genai-platform/helm/genai-platform/values.yaml
-api:
-  image:
-    tag: "v3-good"
-```
-
-Commit and push:
-```bash
-git add .
-git commit -m "Deploy good version v3-good"
-git push origin main
+kubectl apply -f training/manifests/rollout.yaml
 ```
 
 ## Expected Output
 
-- Rollout detects failure via analysis
-- Traffic automatically rolls back to stable version
-- New deployment succeeds with good metrics
-
-## Validation Steps
-
-1. Check rollout status:
-   ```bash
-   kubectl argo rollouts get rollout genai-api -n genai-platform
-   ```
-
-2. Verify pod versions:
-   ```bash
-   kubectl get pods -n genai-platform -o jsonpath='{.items[*].spec.containers[*].image}'
-   ```
-
-3. Check analysis run results:
-   ```bash
-   kubectl get analysisruns -n genai-platform
-   ```
-
-## Troubleshooting
-
-- **Rollback not triggering**: Check analysis failure criteria and rollout configuration
-- **Manual abort fails**: Ensure rollout is in correct state for abort
-- **Traffic not switching**: Verify service selector and rollout labels
+- Analysis fails for the bad revision
+- Rollout pauses or degrades
+- Undo returns traffic to the previous good revision
 
 ## What Just Happened?
 
-You experienced automated failure detection and rollback. Argo Rollouts paused the canary when metrics indicated problems and rolled back to the stable version, preventing impact on users.
-
-## Challenge Exercise
-
-Configure the rollout to automatically abort on analysis failure without manual intervention. Test with a version that fails metrics and observe the automatic rollback.
+You tested the failure path of progressive delivery. The rollout controller allowed a limited canary attempt, analysis detected that the new revision was unhealthy, and the stable revision remained available for users.

@@ -1,107 +1,75 @@
-# 06: Implementing Canary Deployment
+# 06: Canary Deployment with Argo Rollouts
 
 ## Objective
 
-Replace your standard Deployment with an Argo Rollouts Rollout CR to implement canary deployment strategy with gradual traffic shifting.
+Deploy a focused API rollout in `genai-rollouts` and trigger a canary revision without disturbing the GitOps-managed Helm release in `genai-gitops`.
 
 ## Prerequisites
 
-- Argo Rollouts installed (from Lab 05)
-- ArgoCD Application managing your app
-- ArgoCD CLI installed and logged in
+- Argo Rollouts installed
+- Prometheus stack running
 
 ## Step-by-step Instructions
 
-### 1. Examine Current Deployment
+### 1. Create the rollout namespace
 
-Check your current deployment:
 ```bash
-kubectl get deployment -n genai-platform
+kubectl create namespace genai-rollouts --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-### 2. Create Rollout Manifest
+### 2. Apply the service, PodMonitor, and AnalysisTemplate
 
-Apply the provided `rollout.yaml`:
+```bash
+kubectl apply -f training/manifests/service.yaml
+kubectl apply -f training/manifests/rollout-podmonitor.yaml
+kubectl apply -f training/manifests/analysis-template.yaml
+```
+
+### 3. Apply the rollout
+
 ```bash
 kubectl apply -f training/manifests/rollout.yaml
 ```
 
-This replaces your Deployment with a Rollout.
+The rollout starts with a stable revision that points at the same API image used elsewhere in the workshop.
 
-### 3. Update ArgoCD Application
+### 4. Start background traffic
 
-Since we changed from Deployment to Rollout, update your ArgoCD app to ignore the old Deployment:
 ```bash
-# Add resource exclusion for the old deployment
-argocd app set genai-platform --resource-exclusions "apps/Deployment:genai-api"
+kubectl apply -f training/manifests/rollout-load-generator.yaml
 ```
 
-### 4. Deploy New Version
+This traffic source is important because the Prometheus analysis checks need live request data.
 
-Update the image tag in your Helm values to trigger a canary rollout:
-```yaml
-# In genai-platform/helm/genai-platform/values.yaml
-api:
-  image:
-    tag: "v2"  # Change from v1
+### 5. Trigger a canary update
+
+```bash
+kubectl patch rollout genai-api -n genai-rollouts \
+  --type json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/env/1/value","value":"WARNING"}]'
 ```
 
-Commit and push:
+This command changes only the `LOG_LEVEL` environment variable. That is enough to create a new ReplicaSet and start a canary rollout, while keeping the application behavior healthy.
+
+### 6. Watch the rollout
+
 ```bash
-git add .
-git commit -m "Update API image to v2 for canary deployment"
-git push origin main
-```
-
-### 5. Monitor Canary Rollout
-
-Watch the rollout progress:
-```bash
-kubectl argo rollouts get rollout genai-api -n genai-platform -w
-```
-
-### 6. Promote Rollout
-
-Once analysis passes (we'll add this later), promote to full rollout:
-```bash
-kubectl argo rollouts promote genai-api -n genai-platform
+kubectl argo rollouts get rollout genai-api -n genai-rollouts -w
 ```
 
 ## Expected Output
 
-- Rollout CR created
-- Canary deployment starts with 20% traffic to new version
-- Gradual traffic increase: 20% → 50% → 100%
-- Rollout completes successfully
+- Rollout progresses through `20%`, `50%`, then `100%`
+- Old and new ReplicaSets appear during the canary
+- Analysis runs are created at the canary checkpoints
 
 ## Validation Steps
 
-1. Check rollout status:
-   ```bash
-   kubectl argo rollouts get rollout genai-api -n genai-platform
-   ```
-
-2. Verify pods:
-   ```bash
-   kubectl get pods -n genai-platform
-   ```
-   Should show both old and new version pods during canary.
-
-3. Check service traffic:
-   ```bash
-   kubectl describe service genai-api -n genai-platform
-   ```
-
-## Troubleshooting
-
-- **Rollout not starting**: Ensure Rollout CR is applied and image tag changed
-- **Traffic not shifting**: Check service selector matches rollout labels
-- **Promotion fails**: Verify analysis templates (added in next lab)
+```bash
+kubectl argo rollouts get rollout genai-api -n genai-rollouts
+kubectl get pods -n genai-rollouts
+```
 
 ## What Just Happened?
 
-You replaced your Deployment with a Rollout CR that implements canary deployment. Traffic gradually shifts from the stable version to the new version, allowing you to monitor for issues before full deployment.
-
-## Challenge Exercise
-
-Modify the canary steps in `rollout.yaml` to use different percentages (10%, 30%, 60%, 100%) and pause durations. Redeploy and observe the changes.
+You created a second deployment path just for progressive delivery experiments. Argo Rollouts now controls how quickly a new ReplicaSet is introduced and whether analysis should pause or stop that promotion.

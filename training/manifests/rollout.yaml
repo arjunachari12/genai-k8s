@@ -2,78 +2,75 @@ apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
   name: genai-api
-  namespace: genai-platform
+  namespace: genai-rollouts
   labels:
-    app: genai-platform
-    component: api
+    app.kubernetes.io/name: genai-rollouts-api
 spec:
-  replicas: 3
+  replicas: 2
   strategy:
     canary:
       steps:
-      - setWeight: 20
-      - pause: {duration: 30s}
-      - analysis:
-          templates:
-          - templateName: success-rate
-          args:
-          - name: service-name
-            value: genai-api-canary
-          - name: namespace
-            value: genai-platform
-      - setWeight: 50
-      - pause: {duration: 30s}
-      - analysis:
-          templates:
-          - templateName: success-rate
-          args:
-          - name: service-name
-            value: genai-api-canary
-          - name: namespace
-            value: genai-platform
-      - setWeight: 100
-      - pause: {duration: 30s}
+        - setWeight: 20
+        - pause:
+            duration: 30s
+        - analysis:
+            templates:
+              - templateName: genai-api-success
+        - setWeight: 50
+        - pause:
+            duration: 30s
+        - analysis:
+            templates:
+              - templateName: genai-api-success
+        - setWeight: 100
+        - pause:
+            duration: 20s
   selector:
     matchLabels:
-      app: genai-platform
-      component: api
+      app.kubernetes.io/name: genai-rollouts-api
   template:
     metadata:
       labels:
-        app: genai-platform
-        component: api
+        app.kubernetes.io/name: genai-rollouts-api
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8000"
         prometheus.io/path: "/metrics"
     spec:
       containers:
-      - name: api
-        image: "genai-api:v1"  # Update this to match your image
-        imagePullPolicy: IfNotPresent
-        ports:
-        - name: http
-          containerPort: 8000
-        env:
-        - name: APP_NAME
-          value: "genai-api"
-        - name: LOG_LEVEL
-          value: "INFO"
-        - name: LLM_URL
-          value: "http://genai-llm:8001"
-        - name: MODEL_NAME
-          value: "llama2"
-        - name: OLLAMA_TIMEOUT_SECONDS
-          value: "30"
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: http
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: http
-          initialDelaySeconds: 30
-          periodSeconds: 30
+        - name: api
+          image: arjunachari12/genai-api:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: APP_NAME
+              value: "genai-rollouts-api"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: LLM_URL
+              value: "http://genai-genai-platform-llm.genai-staging.svc.cluster.local:11434"
+            - name: MODEL_NAME
+              value: "tinyllama"
+            - name: OLLAMA_TIMEOUT_SECONDS
+              value: "120"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
