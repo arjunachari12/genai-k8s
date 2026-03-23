@@ -8,6 +8,7 @@ Install Argo Rollouts controller to enable progressive delivery capabilities lik
 
 - ArgoCD installed and running
 - GenAI application deployed
+- ArgoCD CLI installed and logged in
 
 ## Step-by-step Instructions
 
@@ -26,7 +27,7 @@ kubectl wait --for=condition=Ready pod --all -n argo-rollouts --timeout=300s
 ### 2. Install Argo Rollouts CLI
 
 ```bash
-# On Linux
+# Download and install kubectl plugin
 curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
 chmod +x kubectl-argo-rollouts-linux-amd64
 sudo mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
@@ -75,7 +76,12 @@ kubectl port-forward svc/argo-rollouts-dashboard -n argo-rollouts 3100:3100
 
 3. List rollouts (should be empty for now):
    ```bash
-   kubectl argo rollouts list rollouts -n genai-platform
+   kubectl argo rollouts list rollouts -A
+   ```
+
+4. Check CRDs:
+   ```bash
+   kubectl get crd | grep rollouts
    ```
 
 ## Troubleshooting

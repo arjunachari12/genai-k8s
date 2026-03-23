@@ -47,7 +47,7 @@ kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus-adapter
 
 ```bash
 kubectl get apiservice | grep custom.metrics
-kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | jq
+kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1 | python3 -m json.tool
 ```
 
 ## Expected Outcome

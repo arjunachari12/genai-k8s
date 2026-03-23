@@ -85,4 +85,4 @@ kubectl delete job genai-api-load-generator -n genai-staging
 
 ## Challenge Exercise
 
-Change the threshold in the ScaledObject from `1.5` to `1.0` seconds and observe how the scaling behavior changes.
+Change the threshold in the ScaledObject from `0.9` to `1.2` seconds and observe how the scaling behavior changes.

@@ -76,7 +76,7 @@ genai_api_latency_p95_seconds{namespace="genai-staging"}
 
 ```bash
 kubectl get --raw \
-  "/apis/custom.metrics.k8s.io/v1beta1/namespaces/genai-staging/pods/*/genai_api_latency_p95_seconds" | jq
+  "/apis/custom.metrics.k8s.io/v1beta1/namespaces/genai-staging/pods/*/genai_api_latency_p95_seconds" | python3 -m json.tool
 ```
 
 ## Expected Outcome

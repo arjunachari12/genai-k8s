@@ -35,10 +35,13 @@ kubectl describe scaledobject genai-api-latency -n genai-staging
 This ScaledObject queries:
 
 ```text
-avg(genai_api_latency_p95_seconds{namespace="genai-staging"})
+avg(genai_api_latency_p95_seconds{namespace="genai-staging"}) *
+clamp_max(sum(rate(http_requests_total{namespace="genai-staging",handler="/generate",method="POST"}[2m])) / 0.05, 1)
 ```
 
-It scales when the value rises above `1.5` seconds.
+This keeps the trigger centered on latency while allowing the signal to fall back down as request traffic drains away.
+
+It scales when the effective value rises above `0.9`.
 
 ## Expected Outcome
 

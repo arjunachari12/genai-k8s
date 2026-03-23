@@ -8,6 +8,7 @@ Learn how to handle deployment failures with automated and manual rollback mecha
 
 - Rollout with analysis configured (from Lab 07)
 - Application running stable version
+- ArgoCD CLI installed and logged in
 
 ## Step-by-step Instructions
 
@@ -15,15 +16,18 @@ Learn how to handle deployment failures with automated and manual rollback mecha
 
 Deploy a "bad" version that will fail analysis:
 ```yaml
-# In values.yaml, set to a version that will fail
+# In genai-platform/helm/genai-platform/values.yaml
 api:
   image:
     tag: "v2-bad"
 ```
 
-### 2. Trigger Failing Rollout
-
-Commit the change and let ArgoCD sync. The rollout should start but fail analysis.
+Commit and push:
+```bash
+git add .
+git commit -m "Deploy bad version v2-bad for rollback testing"
+git push origin main
+```
 
 ### 3. Observe Failure Detection
 
@@ -69,9 +73,17 @@ All pods should be running the stable version.
 
 Update to a good version:
 ```yaml
+# In genai-platform/helm/genai-platform/values.yaml
 api:
   image:
     tag: "v3-good"
+```
+
+Commit and push:
+```bash
+git add .
+git commit -m "Deploy good version v3-good"
+git push origin main
 ```
 
 ## Expected Output

@@ -6,50 +6,52 @@ Enable ArgoCD's auto-sync features to automatically deploy changes and maintain 
 
 ## Prerequisites
 
-- ArgoCD Application created (from Lab 02)
+- ArgoCD Application created and synced (from Lab 02)
 - Application currently in Manual sync mode
+- ArgoCD CLI installed and logged in
 
 ## Step-by-step Instructions
 
-### 1. Enable Auto-Sync in ArgoCD UI
+### 1. Enable Auto-Sync via CLI
 
-1. Open your `genai-platform` application in ArgoCD UI
-2. Click "App Details" → "Edit"
-3. Under "Sync Policy":
-   - Check "Automatic"
-   - Check "Prune Resources"
-   - Check "Self Heal"
-   - Set "Sync Options":
-     - Allow Empty
-     - Apply Out Of Sync Only
-     - Prune Last
-4. Save changes
+```bash
+# Enable auto-sync, self-heal, and prune
+argocd app set genai-platform \
+  --sync-policy automated \
+  --self-heal \
+  --prune
+```
 
 ### 2. Test Auto-Sync
 
 Make a small change to trigger sync:
-- Edit `helm/genai-platform/values.yaml` and change a replica count or image tag
-- Commit the change (or just modify the file)
+```bash
+# Edit values.yaml to change replica count
+sed -i 's/replicaCount: [0-9]/replicaCount: 2/' genai-platform/helm/genai-platform/values.yaml
+git add .
+git commit -m "Update replica count to 2"
+git push origin main
+```
 
 ### 3. Observe Auto-Sync
 
 Watch ArgoCD automatically detect and sync the change:
 ```bash
-kubectl get applications -n argocd -w
+argocd app get genai-platform --watch
 ```
 
 ### 4. Test Self-Healing
 
 Manually delete a pod to trigger self-healing:
 ```bash
-kubectl delete pod -l app=genai-api -n genai-platform
+kubectl delete pod -l app.kubernetes.io/name=genai-platform -n genai-platform --wait=false
 ```
 
-Watch ArgoCD recreate the pod.
+Watch ArgoCD recreate the pod automatically.
 
 ### 5. Test Pruning
 
-Add a resource to your Helm chart, then remove it. ArgoCD should prune the deleted resource.
+Add a resource to your Helm chart, deploy it, then remove it. ArgoCD should prune the deleted resource.
 
 ## Expected Output
 
@@ -61,7 +63,7 @@ Add a resource to your Helm chart, then remove it. ArgoCD should prune the delet
 
 1. Check application sync status:
    ```bash
-   kubectl get applications genai-platform -n argocd -o yaml | grep syncPolicy
+   argocd app get genai-platform
    ```
 
 2. Verify self-healing:
@@ -70,7 +72,10 @@ Add a resource to your Helm chart, then remove it. ArgoCD should prune the delet
    ```
    Delete a pod and watch it restart.
 
-3. Check ArgoCD UI for sync history and health status.
+3. Check ArgoCD sync history:
+   ```bash
+   argocd app history genai-platform
+   ```
 
 ## Troubleshooting
 

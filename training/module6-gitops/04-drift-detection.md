@@ -8,6 +8,7 @@ Understand how ArgoCD detects configuration drift and reconciles the cluster bac
 
 - ArgoCD Application with auto-sync enabled (from Lab 03)
 - Application in healthy, synced state
+- ArgoCD CLI installed and logged in
 
 ## Step-by-step Instructions
 
@@ -15,7 +16,7 @@ Understand how ArgoCD detects configuration drift and reconciles the cluster bac
 
 Check that your application is synced:
 ```bash
-kubectl get applications genai-platform -n argocd
+argocd app get genai-platform
 ```
 Should show "Synced" status.
 
@@ -25,37 +26,37 @@ Manually modify a deployed resource to create drift:
 
 ```bash
 # Change a deployment's replica count
-kubectl scale deployment genai-api --replicas=2 -n genai-platform
+kubectl scale deployment -l app.kubernetes.io/name=genai-platform --replicas=1 -n genai-platform
 ```
 
 ### 3. Observe Drift Detection
 
 Watch ArgoCD detect the drift:
 ```bash
-kubectl get applications genai-platform -n argocd -w
+argocd app get genai-platform --watch
 ```
 
 The status should change to "OutOfSync".
 
 ### 4. View Drift Details
 
-In ArgoCD UI:
-1. Open your application
-2. Click "App Diff" to see the differences
-3. Note the changes between desired (Git) and live (cluster) state
+```bash
+# Get detailed diff
+argocd app diff genai-platform
+```
 
 ### 5. Trigger Reconciliation
 
 ArgoCD should automatically reconcile (due to auto-sync). If not:
 ```bash
-kubectl patch application genai-platform -n argocd --type merge -p '{"operation":{"sync":{}}}'
+argocd app sync genai-platform
 ```
 
 ### 6. Verify Reconciliation
 
 Check that the replica count returns to the original value:
 ```bash
-kubectl get deployment genai-api -n genai-platform
+kubectl get deployment -l app.kubernetes.io/name=genai-platform -n genai-platform
 ```
 
 ## Expected Output
@@ -69,15 +70,18 @@ kubectl get deployment genai-api -n genai-platform
 
 1. Check application status:
    ```bash
-   kubectl get applications genai-platform -n argocd
+   argocd app get genai-platform
    ```
 
 2. Verify resource matches Git:
    ```bash
-   kubectl get deployment genai-api -n genai-platform -o yaml | grep replicas
+   kubectl get deployment -l app.kubernetes.io/name=genai-platform -n genai-platform -o jsonpath='{.spec.replicas}'
    ```
 
-3. Check ArgoCD UI for sync history.
+3. Check sync history:
+   ```bash
+   argocd app history genai-platform
+   ```
 
 ## Troubleshooting
 

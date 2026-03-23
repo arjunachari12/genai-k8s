@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: file:///home/arjun/genai-k8s
+    repoURL: https://github.com/YOUR_USERNAME/genai-k8s.git  # Replace with your GitHub repo URL
     path: genai-platform/helm/genai-platform
     targetRevision: HEAD
     helm:

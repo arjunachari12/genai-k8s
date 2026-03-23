@@ -20,6 +20,6 @@ spec:
       metadata:
         serverAddress: http://observability-kube-prometh-prometheus.monitoring.svc.cluster.local:9090
         metricName: genai_api_latency_p95_seconds
-        query: avg(genai_api_latency_p95_seconds{namespace="genai-staging"})
-        threshold: "1.5"
-        activationThreshold: "0.8"
+        query: avg(genai_api_latency_p95_seconds{namespace="genai-staging"}) * clamp_max(sum(rate(http_requests_total{namespace="genai-staging",handler="/generate",method="POST"}[2m])) / 0.05, 1)
+        threshold: "0.9"
+        activationThreshold: "0.5"

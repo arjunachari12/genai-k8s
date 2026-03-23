@@ -8,6 +8,7 @@ Replace your standard Deployment with an Argo Rollouts Rollout CR to implement c
 
 - Argo Rollouts installed (from Lab 05)
 - ArgoCD Application managing your app
+- ArgoCD CLI installed and logged in
 
 ## Step-by-step Instructions
 
@@ -30,25 +31,27 @@ This replaces your Deployment with a Rollout.
 ### 3. Update ArgoCD Application
 
 Since we changed from Deployment to Rollout, update your ArgoCD app to ignore the old Deployment:
-- In ArgoCD UI, edit your application
-- Add to "Resource Exclusions": `apps/Deployment`
-
-Or via CLI:
 ```bash
-kubectl patch application genai-platform -n argocd --type merge -p '{"spec":{"ignoreDifferences":[{"group":"apps","kind":"Deployment","name":"genai-api"}]}}'
+# Add resource exclusion for the old deployment
+argocd app set genai-platform --resource-exclusions "apps/Deployment:genai-api"
 ```
 
 ### 4. Deploy New Version
 
 Update the image tag in your Helm values to trigger a canary rollout:
 ```yaml
-# In helm/genai-platform/values.yaml
+# In genai-platform/helm/genai-platform/values.yaml
 api:
   image:
     tag: "v2"  # Change from v1
 ```
 
-Commit and let ArgoCD sync.
+Commit and push:
+```bash
+git add .
+git commit -m "Update API image to v2 for canary deployment"
+git push origin main
+```
 
 ### 5. Monitor Canary Rollout
 

@@ -25,6 +25,15 @@ Module structure:
 7. **Prometheus Analysis** - Add metrics-based rollout validation
 8. **Rollback Scenarios** - Handle deployment failures
 
+## Prerequisites
+
+- A running KIND Kubernetes cluster
+- Your GenAI application deployed via Helm (from `genai-platform/helm/genai-platform/`)
+- GitHub repository created and code pushed
+- `kubectl` access to the cluster
+- `helm` CLI installed
+- `argocd` CLI (we'll install it in Lab 01)
+
 Start here:
 
 [module6-gitops/01-argocd-installation.md](module6-gitops/01-argocd-installation.md)

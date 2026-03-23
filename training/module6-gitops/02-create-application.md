@@ -8,32 +8,50 @@ Create an ArgoCD Application that deploys your existing GenAI Helm chart, establ
 
 - ArgoCD installed and running (from Lab 01)
 - Your GenAI Helm chart in `genai-platform/helm/genai-platform/`
-- Local directory initialized as a Git repository
+- GitHub repository created and code pushed
 - ArgoCD UI accessible
 
 ## Step-by-step Instructions
 
-### 0. Initialize Local Git Repository (Required for ArgoCD)
+### 0. Push Code to GitHub
 
-ArgoCD requires a Git repository as the source, even for local development:
+First, create a GitHub repository and push your code:
 
 ```bash
-cd /home/arjun/genai-k8s
-git init
-git add .
-git commit -m "Initial commit for ArgoCD"
+# Add GitHub remote (replace with your repo URL)
+git remote add origin https://github.com/YOUR_USERNAME/genai-k8s.git
+git push -u origin main
 ```
 
-### 1. Create ArgoCD Application via UI
+### 1. Create ArgoCD Application via CLI
 
-1. Open ArgoCD UI at https://localhost:8080
+Use ArgoCD CLI for better automation:
+
+```bash
+# Login to ArgoCD
+argocd login localhost:8081 --username admin --password $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d) --insecure
+
+# Create the application
+argocd app create genai-platform \
+  --repo https://github.com/YOUR_USERNAME/genai-k8s.git \
+  --path genai-platform/helm/genai-platform \
+  --dest-server https://kubernetes.default.svc \
+  --dest-namespace genai-platform \
+  --sync-policy automated \
+  --self-heal \
+  --prune
+```
+
+### Alternative: Create via UI
+
+1. Open ArgoCD UI at https://localhost:8081
 2. Login with admin credentials
 3. Click "New App"
 4. Fill in the form:
    - **Application Name**: `genai-platform`
    - **Project**: `default`
-   - **Sync Policy**: `Manual` (we'll change this later)
-   - **Repository URL**: `file:///home/arjun/genai-k8s` (local Git repo)
+   - **Sync Policy**: `Automatic`
+   - **Repository URL**: `https://github.com/YOUR_USERNAME/genai-k8s.git` (replace with your repo)
    - **Path**: `genai-platform/helm/genai-platform`
    - **Cluster**: `https://kubernetes.default.svc` (in-cluster)
    - **Namespace**: `genai-platform` (or your app namespace)
@@ -46,17 +64,12 @@ In the ArgoCD UI, under "Helm" tab:
 
 ### 3. Sync the Application
 
-1. Click "Create" to create the app
-2. Click "Sync" to deploy
-3. Monitor the sync process
-
-### Alternative: Create via YAML
-
-Apply the provided `argocd-app.yaml`:
-
+If using CLI:
 ```bash
-kubectl apply -f training/manifests/argocd-app.yaml
+argocd app sync genai-platform
 ```
+
+Or click "Sync" in the UI and monitor the process.
 
 ## Expected Output
 
@@ -80,10 +93,10 @@ kubectl apply -f training/manifests/argocd-app.yaml
 
 ## Troubleshooting
 
-- **Repository not accessible**: Ensure the path `genai-platform/helm/genai-platform` exists and you've initialized a Git repository in `/home/arjun/genai-k8s`
+- **Repository not accessible**: Ensure your GitHub repository exists and is public (or you have proper authentication). Check the repo URL.
 - **Helm chart errors**: Validate your Helm chart: `helm template genai-platform/helm/genai-platform/`
 - **Sync fails**: Check ArgoCD logs: `kubectl logs -n argocd deployment/argocd-application-controller`
-- **File URL not working**: ArgoCD requires a Git repository. Make sure you've run `git init` and `git add . && git commit` in the workspace root.
+- **CLI login fails**: Ensure port-forward is running: `kubectl port-forward svc/argocd-server -n argocd 8081:443`
 
 ## What Just Happened?
 

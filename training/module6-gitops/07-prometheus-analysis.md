@@ -8,6 +8,7 @@ Integrate Prometheus metrics into your canary rollout to automatically validate 
 
 - Argo Rollouts Rollout deployed (from Lab 06)
 - Prometheus running in cluster (from your monitoring setup)
+- ArgoCD CLI installed and logged in
 
 ## Step-by-step Instructions
 
@@ -32,20 +33,7 @@ kubectl apply -f training/manifests/analysis-template.yaml
 
 ### 3. Update Rollout with Analysis
 
-Modify your `rollout.yaml` to include analysis steps. Add to the strategy:
-
-```yaml
-analysis:
-  templates:
-  - templateName: success-rate
-  args:
-  - name: service-name
-    value: genai-api
-  - name: namespace
-    value: genai-platform
-```
-
-Apply the updated rollout:
+The provided `rollout.yaml` already includes analysis steps. Apply it:
 ```bash
 kubectl apply -f training/manifests/rollout.yaml
 ```
@@ -54,10 +42,17 @@ kubectl apply -f training/manifests/rollout.yaml
 
 Change image tag to v3 and trigger rollout:
 ```yaml
-# In values.yaml
+# In genai-platform/helm/genai-platform/values.yaml
 api:
   image:
     tag: "v3"
+```
+
+Commit and push:
+```bash
+git add .
+git commit -m "Update API image to v3 with analysis"
+git push origin main
 ```
 
 ### 5. Monitor Analysis

@@ -37,13 +37,18 @@ Wait for all pods to be ready:
 kubectl wait --for=condition=Ready pod --all -n argocd --timeout=300s
 ```
 
-### 3. Install ArgoCD CLI (Optional but Recommended)
+### 3. Install ArgoCD CLI
+
+The CLI is essential for automation and troubleshooting:
 
 ```bash
-# On Linux
+# Download and install ArgoCD CLI
 curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
 sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
 rm argocd-linux-amd64
+
+# Verify installation
+argocd version --client
 ```
 
 ### 4. Access ArgoCD UI
