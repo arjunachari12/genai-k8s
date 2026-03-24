@@ -75,3 +75,12 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 - If port `8081` is busy, use another local port such as `8082`.
 - If CLI login later fails through port-forward, use `--grpc-web`.
 - If pods are not ready, inspect logs with `kubectl logs -n argocd deployment/argocd-server`.
+
+argocd app create guestbook \
+  --repo https://github.com/argoproj/argocd-example-apps \
+  --path guestbook \
+  --dest-server https://kubernetes.default.svc \
+  --dest-namespace default \
+  --sync-policy automated \
+  --auto-prune \
+  --self-heal
