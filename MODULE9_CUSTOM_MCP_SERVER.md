@@ -1,71 +1,95 @@
 # Module 9: Building and Deploying a Custom MCP Server
 
-The Model Context Protocol (MCP) securely exposes data and tools to AI assistants. While you can run an MCP server locally to poke at your Kubernetes cluster (as seen in Module 8), deploying an MCP Server *inside* the cluster lets AI agents safely interact with your environment directly.
+The Model Context Protocol (MCP) lets AI assistants call tools safely. In this module, you will deploy a small **read-only Kubernetes MCP server** inside your cluster so later modules can use live cluster data without giving the AI write access.
 
-In this module, we will build a custom Python MCP server that exposes Kubernetes cluster information (like Nodes, Namespaces, and Pods) to AI.
+## 1. What the Server Exposes
 
-## 1. Reviewing the Code
+Open `genai-platform/mcp-server/server.py`.
 
-Navigate to the `genai-platform/mcp-server/` folder in the repository.
+This server exposes these tools:
 
-1. **`server.py`**: This uses the `mcp` SDK to create three AI tools:
-   - `get_cluster_nodes`
-   - `get_namespaces`
-   - `get_pods_in_namespace`
-2. **`Dockerfile`**: Packages the script and the Kubernetes python client into an image.
-3. **`k8s/rbac.yaml`**: Very importantly, your MCP Server acts as an AI proxy, so it needs explicit Kubernetes permissions. This file restricts the server to only `get` and `list` operations, making it safe for AI integration.
+- `get_cluster_nodes`
+- `get_namespaces`
+- `get_pods_in_namespace`
+- `get_recent_events`
+- `get_pod_logs`
 
-## 2. Build the Docker Image
+The goal is simple: give the AI enough visibility to inspect the cluster, but not enough permission to change it.
 
-From the `genai-platform/mcp-server` directory, build the image:
+## 2. Review the RBAC
+
+Open `genai-platform/mcp-server/k8s/rbac.yaml`.
+
+Notice that the service account only has read permissions for:
+
+- `nodes`
+- `namespaces`
+- `pods`
+- `events`
+- `pods/log`
+
+This is an important design pattern for AI systems on Kubernetes:
+
+- keep tool permissions narrow
+- separate read tools from write actions
+- make the AI safe by default
+
+## 3. Build the Image
+
+From the repository root:
 
 ```bash
-cd /home/arjun/genai-k8s/genai-platform/mcp-server
-docker build -t arjunachari12/mcp-k8s-server:1.0.0 .
+cd /home/arjun/genai-k8s
+docker build -t mcp-k8s-server:0.1.0 genai-platform/mcp-server
 ```
 
-If you are using KIND, load the image into the cluster directly so it doesn't try to pull from the internet:
-```bash
-kind load docker-image arjunachari12/mcp-k8s-server:1.0.0
-```
-
-## 3. Deploy the MCP Server to Kubernetes
-
-Apply the Role-Based Access Control configuration to grant the server read permissions:
+If you are using `kind`, load the image directly:
 
 ```bash
-kubectl apply -f k8s/rbac.yaml
+kind load docker-image mcp-k8s-server:0.1.0 --name multi-node-cluster
 ```
 
-Deploy the server itself:
+## 4. Deploy to Kubernetes
+
+Apply the RBAC:
 
 ```bash
-kubectl apply -f k8s/deployment.yaml
+kubectl apply -f genai-platform/mcp-server/k8s/rbac.yaml
 ```
 
-Verify that it's running:
+Deploy the server:
+
 ```bash
-kubectl get pods -n genai -l app=mcp-server
+kubectl apply -f genai-platform/mcp-server/k8s/deployment.yaml
+kubectl rollout status deployment/mcp-server -n genai
 ```
 
-## 4. Test the Deployed Server
+## 5. Test the Server
 
-Because this MCP server communicates via Server-Sent Events (SSE) over HTTP, you can verify it locally by forwarding the port:
+Port-forward the service:
 
 ```bash
 kubectl port-forward -n genai svc/mcp-server-svc 8000:80
 ```
 
-With the port-forward running, your server is accessible at `http://localhost:8000`. If you configure an AI client (like Claude Desktop or Cursor) pointing to `http://localhost:8000/sse`, it will be able to invoke the cluster tools!
+The MCP SSE endpoint will be:
 
-### Manual CLI Test
-
-You can manually trigger an MCP SSE endpoint if you have a client or `curl`. Since the SSE protocol negotiates a connection first, let's verify the server is up:
-
-```bash
-curl http://localhost:8000/
+```text
+http://localhost:8000/sse
 ```
-(Expected: The FastMCP server acknowledges it's running or provides the SSE connection stream).
+
+You can point an MCP-aware client at that URL, or use it in the next module when the LangGraph assistant connects to the cluster.
+
+## Why This Matters
+
+This MCP server is the bridge between:
+
+- Kubernetes cluster state
+- AI tools
+- agent workflows
+
+Without MCP, the model only sees a text prompt. With MCP, the model or agent can inspect real cluster context when it needs it.
 
 ## Summary
-You wrote a custom python toolkit, containerized it, gave it the minimum required RBAC permissions, and deployed it. You can extend this template by adding any `@mcp.tool()` function you want to expose specialized actions (e.g., triggering a backup, scaling a deployment) directly to your AI agents!
+
+You now have a read-only Kubernetes MCP server deployed inside the cluster. In the next module, a LangGraph-based AI assistant will connect to this server, inspect unhealthy pods, and explain failures using a local Ollama model.

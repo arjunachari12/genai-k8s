@@ -1,108 +1,181 @@
 # Module 10: Agentic AI Systems on Kubernetes
 
-In earlier modules, you used AI to manually write Kubernetes manifests (`kubectl-ai`) and securely queried cluster data by pointing a local AI assistant to an MCP Server.
+In Module 9, you connected AI tools to Kubernetes through MCP. In this module, you will deploy a small **AI Kubernetes assistant** inside your `kind` cluster.
 
-In this module, you will design and deploy a fully autonomous **Agentic AI System**. Instead of a human prompting an LLM, a scheduled Kubernetes workload (the "Agent") will proactively query the cluster, analyze failures using an LLM, and log a Root Cause Analysis (RCA). 
+This lab keeps the moving parts simple:
 
-## 1. Kubernetes as an AI Orchestration Runtime
+- **Ollama** runs the model locally
+- a read-only **MCP server** exposes Kubernetes tools
+- **LangGraph** drives the agent loop
+- Kubernetes **Jobs** and **CronJobs** run the assistant
 
-Kubernetes provides the perfect foundation for orchestrating intelligent agents because it natively handles:
-- **Scheduling**: Running agents periodically (CronJobs) or continuously (Deployments).
-- **Service Discovery**: Connecting an Agent to an MCP Server microservice seamlessly via DNS.
-- **Resilience**: Restarting an Agent if the LLM API call times out or fails unexpectedly.
+The result is similar in spirit to `kubectl-ai`, but the assistant runs inside the cluster and decides which tools to call before it answers.
 
-### Architecting ML Lifecycle Tasks
-Agentic architectures can manage ML tasks like:
-- **Continuous Retraining**: An agent monitors model drift metrics in Prometheus and triggers a Kubeflow pipeline if drift is detected.
-- **Automated RCA**: An agent identifies `CrashLoopBackOff` pods, reads their logs, and posts a Slack message with the exact code fix.
-- **Self-Healing AI Pipelines**: An agent notices a GPU node has run out of memory, halts the lower-priority batch jobs, and reshuffles the queue.
+## 1. Architecture
 
----
+The assistant uses three components:
 
-## 2. Building the RCA Agent Prototype
+1. **Ollama**
+   Runs a local model in the cluster. We use `tinyllama` to keep the workshop lightweight.
 
-Navigate to `genai-platform/ai-agent/`. 
+2. **MCP Server**
+   Exposes read-only Kubernetes tools:
+   - `get_pods_in_namespace`
+   - `get_recent_events`
+   - `get_pod_logs`
 
-The `agent.py` script demonstrates an Automated RCA pattern:
-1. It connects to the `mcp-server-svc` created in Module 9.
-2. It invokes the `get_pods_in_namespace` tool over the Model Context Protocol.
-3. It passes the raw pod data to an OpenAI model with a strict system prompt.
-4. It outputs an SRE-style Root Cause Analysis.
+3. **LangGraph Assistant**
+   Uses an agent loop to:
+   - inspect the namespace
+   - choose tools
+   - summarize the issue
+   - recommend a fix
 
-### Build the Image
+## 2. Review the Code
+
+Open these files:
+
+- `genai-platform/mcp-server/server.py`
+- `genai-platform/ai-agent/agent.py`
+
+### MCP Server
+
+The MCP server uses `FastMCP` and the Kubernetes Python client. It is intentionally read-only so students can focus on tool use without giving the AI permission to mutate the cluster.
+
+### LangGraph Assistant
+
+The assistant uses:
+
+- `ChatOllama` for the local model
+- `StateGraph` from LangGraph to model the investigation flow
+- MCP-backed investigation steps that fetch pods, events, and logs
+
+The flow is:
+
+1. receive a question
+2. inspect pods through MCP
+3. branch to events and optional logs
+4. print a short diagnosis
+
+## 3. Build the Images
+
+From the repository root:
+
 ```bash
-cd /home/arjun/genai-k8s/genai-platform/ai-agent
-docker build -t arjunachari12/ai-agent:1.0.0 .
+cd /home/arjun/genai-k8s
+docker build -t mcp-k8s-server:0.1.0 genai-platform/mcp-server
+docker build -t ai-k8s-assistant:0.1.0 genai-platform/ai-agent
 ```
 
-If using KIND, load it into the cluster:
-```bash
-# If your cluster is named something specific like "multi-node-cluster", append --name multi-node-cluster
-kind load docker-image arjunachari12/ai-agent:1.0.0
-```
-
----
-
-## 3. Deploying the Agent
-
-Because this agent requires an API Key, create a Secret in your cluster to securely store your `OPENAI_API_KEY`:
+Load both into `kind`:
 
 ```bash
-kubectl create secret generic openai-secret \
-  --from-literal=apiKey="YOUR-OPENAI-API-KEY" \
-  --namespace genai
+kind load docker-image mcp-k8s-server:0.1.0 --name multi-node-cluster
+kind load docker-image ai-k8s-assistant:0.1.0 --name multi-node-cluster
 ```
 
-Now, apply the CronJob manifest:
+## 4. Deploy the Stack
+
+Deploy Ollama:
+
 ```bash
-kubectl apply -f k8s/cronjob.yaml
+kubectl apply -f genai-platform/ai-agent/k8s/ollama.yaml
+kubectl rollout status deployment/ollama -n genai --timeout=600s
 ```
 
-The CronJob is scheduled to run every 5 minutes. To trigger it immediately for testing, create a Job from the CronJob:
+Deploy the MCP server:
+
 ```bash
-kubectl create job --from=cronjob/ai-agent-rca ai-agent-test -n genai
+kubectl apply -f genai-platform/mcp-server/k8s/rbac.yaml
+kubectl apply -f genai-platform/mcp-server/k8s/deployment.yaml
+kubectl rollout status deployment/mcp-server -n genai
 ```
 
----
+Run the assistant as a one-time Job:
 
-## 4. Observe the Agent in Action (Exercise)
-
-Let's test the Agent's RCA capabilities by intentionally breaking a deployment.
-
-**Step 1:** Create a failing pod.
 ```bash
-kubectl create deployment broken-redis --image=redis:this-tag-does-not-exist -n genai
+kubectl apply -f genai-platform/ai-agent/k8s/job.yaml
 ```
 
-**Step 2:** Verify it is failing.
+Or run it every 15 minutes:
+
+```bash
+kubectl apply -f genai-platform/ai-agent/k8s/cronjob.yaml
+```
+
+## 5. Create a Failure for the Assistant
+
+Create a broken deployment:
+
+```bash
+kubectl create deployment broken-redis \
+  --image=redis:this-tag-does-not-exist \
+  -n genai
+```
+
+Verify that the pod is unhealthy:
+
 ```bash
 kubectl get pods -n genai
 ```
-*(You should see `ImagePullBackOff` for the broken-redis pod).*
 
-**Step 3:** Trigger the AI Agent.
+You should see `ImagePullBackOff` or `ErrImagePull`.
+
+## 6. Observe the Agent
+
+Read the Job logs:
+
 ```bash
-kubectl create job --from=cronjob/ai-agent-rca ai-agent-rca-test-1 -n genai
+kubectl logs -n genai job/ai-k8s-assistant
 ```
 
-**Step 4:** Read the RCA generated by the Agent.
-Wait for the Job pod to complete, then fetch its logs:
-```bash
-# Find the specific pod created by the job
-export AGENT_POD=$(kubectl get pods -n genai -l job-name=ai-agent-rca-test-1 -o jsonpath='{.items[0].metadata.name}')
+The output should show:
 
-# View the AI analysis
-kubectl logs -n genai $AGENT_POD
+- the assistant prompt
+- the tool calls chosen by the model
+- tool results from MCP
+- the final diagnosis
+
+Expected outcome:
+
+- the assistant identifies `broken-redis` as unhealthy
+- it checks namespace events
+- it explains that the image tag is invalid
+- it suggests the next `kubectl` command or manifest fix
+
+## 7. What Students Learn
+
+This example demonstrates the core pieces of agentic AI on Kubernetes:
+
+- **agent orchestration** with LangGraph
+- **tool use** through MCP
+- **local inference** with Ollama
+- **safe Kubernetes access** with RBAC
+- **Kubernetes-native execution** with Jobs and CronJobs
+
+This is the same pattern you can expand later into:
+
+- incident analysis agents
+- rollout verifiers
+- approval-based remediation
+- self-healing operators
+
+## 8. Cleanup
+
+```bash
+kubectl delete job ai-k8s-assistant -n genai --ignore-not-found
+kubectl delete cronjob ai-k8s-assistant -n genai --ignore-not-found
+kubectl delete deployment broken-redis -n genai --ignore-not-found
 ```
 
-**Expected Result:**
-The Agent will connect to the MCP server, retrieve the fact that `broken-redis` is in an `ImagePullBackOff` state, consult the LLM, and print a clear technical root cause analysis suggesting that the image tag `this-tag-does-not-exist` is invalid.
+To remove the local AI stack:
 
-**Step 5:** Clean up.
 ```bash
-kubectl delete deployment broken-redis -n genai
-kubectl delete job ai-agent-rca-test-1 -n genai
+kubectl delete -f genai-platform/ai-agent/k8s/ollama.yaml
+kubectl delete -f genai-platform/mcp-server/k8s/deployment.yaml
+kubectl delete -f genai-platform/mcp-server/k8s/rbac.yaml
 ```
 
 ## Summary
-You have successfully deployed an autonomous Kubernetes agent! By chaining an MCP server (providing secure read-access to the cluster) with a Python orchestration script and an LLM, you have built the foundation for an unassisted, self-healing system.
+
+You now have a minimal **AI Kubernetes assistant** running in-cluster. It uses a local Ollama model, LangGraph for agent execution, and a read-only MCP server for live Kubernetes data. This gives students a clear, hands-on introduction to agentic AI without hiding the important implementation details.

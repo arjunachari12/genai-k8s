@@ -1,28 +1,27 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: ai-agent-rca
+  name: ai-k8s-assistant
   namespace: genai
 spec:
-  # Run every 5 minutes
-  schedule: "*/5 * * * *"
+  schedule: "*/15 * * * *"
   jobTemplate:
     spec:
       template:
         spec:
+          restartPolicy: OnFailure
           containers:
-          - name: ai-agent
-            image: arjunachari12/ai-agent:1.0.0
+          - name: ai-k8s-assistant
+            image: ai-k8s-assistant:0.1.0
             imagePullPolicy: IfNotPresent
             env:
-            # We connect to the MCP server deployed in Module 9
             - name: MCP_SERVER_URL
               value: "http://mcp-server-svc.genai.svc.cluster.local:80/sse"
-            # Students must supply their API key via a Secret or direct env var
-            - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: openai-secret
-                  key: apiKey
-                  optional: true
-          restartPolicy: OnFailure
+            - name: OLLAMA_BASE_URL
+              value: "http://ollama.genai.svc.cluster.local:11434"
+            - name: OLLAMA_MODEL
+              value: "tinyllama"
+            - name: TARGET_NAMESPACE
+              value: "genai"
+            - name: ASSISTANT_PROMPT
+              value: "Inspect the genai namespace. Use tools first and summarize any failures with the likely fix."

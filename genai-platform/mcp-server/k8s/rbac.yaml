@@ -12,7 +12,7 @@ metadata:
   name: mcp-cluster-reader
 rules:
 - apiGroups: [""]
-  resources: ["nodes", "namespaces", "pods"]
+  resources: ["nodes", "namespaces", "pods", "events", "pods/log"]
   verbs: ["get", "watch", "list"]
 ---
 # 3. Bind the ClusterRole to the ServiceAccount
